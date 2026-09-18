@@ -67,7 +67,7 @@ def status_callback(msg: str):
 # 核心处理函数（线程中运行）
 # ============================================================
 
-def run_processing(text: str, tier_key: str, model_id: str, budget_tokens: int):
+def run_processing(text: str, tier_key: str, model_id: str, budget_tokens: int, book_name: str = ""):
     """在后台线程中运行处理"""
     try:
         app_state.processing = True

@@ -408,8 +408,28 @@ def extract_batch_content(
             json_str = json_str.split("```json")[1].split("```")[0]
         elif "```" in json_str:
             json_str = json_str.split("```")[1].split("```")[0]
-        parsed = json.loads(json_str.strip())
-        seqs = parsed.get("sequences") or []
+        json_str = json_str.strip()
+        def _try_loads(s):
+            try:
+                return json.loads(s)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        parsed = _try_loads(json_str)
+        # 整体解析失败时，再尝试提取第一个 { 到最后一个 } 之间的主 JSON 体（忽略前后解释文字）
+        if parsed is None:
+            _s, _e = json_str.find("{"), json_str.rfind("}")
+            if _s != -1 and _e != -1 and _e > _s:
+                parsed = _try_loads(json_str[_s:_e + 1])
+        if parsed is None:
+            raise json.JSONDecodeError("无法解析 JSON 输出", json_str, 0)
+        # 规整成序列列表：顶层数组 -> 本身作为序列；顶层 dict -> 取 sequences（或单个 sequence 包一层）
+        if isinstance(parsed, list):
+            seqs = (parsed[0].get("sequences") or []) if (parsed and isinstance(parsed[0], dict) and "sequences" in parsed[0]) else parsed
+        else:
+            seqs = parsed.get("sequences")
+            if seqs is None and parsed.get("sequence"):
+                seqs = [parsed]
+            seqs = seqs or []
         norm = []
         for s in seqs:
             if not isinstance(s, dict):
