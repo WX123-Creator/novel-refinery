@@ -108,7 +108,6 @@ def run_processing(text: str, tier_key: str, model_id: str, budget_tokens: int):
                 _files = export_from_blocks(_blocks, _br, book_output_dir(book_name))
                 app_state.result = {
                     "files": _files,
-                    "volume_results": [],
                     "overview": "【降级导出】处理中途出错，已直接从已提炼的分块成果抢救导出（未触发 AI 汇总）。\n\n错误：%s" % str(e),
                     "cost_summary": "（降级导出，未完成 AI 汇总）",
                     "total_tokens": 0,
@@ -224,17 +223,11 @@ def build_ui():
                 # 输出区
                 gr.Markdown("### 📦 导出文件")
                 file_links = gr.HTML(
-                    value="<p style='color:#9ca3af;'>处理完成后，6 份分析报告将在此显示</p>"
+                    value="<p style='color:#9ca3af;'>处理完成后，节拍级故事结构报告将在此显示</p>"
                 )
 
-                # 文本预览区
-                with gr.Tabs():
-                    with gr.TabItem("📄 全书总览"):
-                        overview_box = gr.Markdown("等待处理...")
-                    with gr.TabItem("📋 各卷拆解"):
-                        volume_box = gr.Markdown("等待处理...")
-                    with gr.TabItem("🗂️ 其他报告"):
-                        other_box = gr.Markdown("等待处理...")
+                # 文本预览区（仅保留全书故事结构一份输出）
+                overview_box = gr.Markdown("等待处理...")
 
         gr.Markdown(
             """
@@ -343,7 +336,7 @@ def build_ui():
         poll_trigger.tick(
             fn=refresh_status,
             inputs=[],
-            outputs=[cost_box, status_output, progress_bar, file_links, overview_box, volume_box, other_box, start_btn, cancel_btn],
+            outputs=[cost_box, status_output, progress_bar, file_links, overview_box, start_btn, cancel_btn],
         )
 
     return demo
@@ -366,9 +359,7 @@ def _build_idle_output():
         "<div class='cost-box'><strong>💰 费用统计</strong><br>调用次数: 0 | 总 Tokens: 0 | 费用: ¥0.000000</div>",
         "等待开始...",
         "<div style='background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px;'><strong>📈 处理进度</strong><br>等待开始...</div>",
-        "<p style='color:#9ca3af;'>处理完成后，6 份分析报告将在此显示</p>",
-        "等待处理...",
-        "等待处理...",
+        "<p style='color:#9ca3af;'>处理完成后，节拍级故事结构报告将在此显示</p>",
         "等待处理...",
         gr.Button(interactive=True),
         gr.Button(interactive=False),
@@ -384,8 +375,6 @@ def _build_processing_output(progress_val, status_md):
         status_md,
         progress_html,
         "<p style='color:#9ca3af;'>处理中，请稍候...</p>",
-        "等待处理...",
-        "等待处理...",
         "等待处理...",
         gr.Button(interactive=False),
         gr.Button(interactive=True),
@@ -419,27 +408,11 @@ def _build_success_output(result):
     else:
         file_html = "<p style='color:#9ca3af;'>文件生成失败</p>"
 
-    # 全书总览
+    # 全书故事
     overview = result.get("overview", "无内容")
     if len(overview) > 2000:
         overview = overview[:2000] + "\n\n...（内容较长，请下载完整文件查看）"
     overview_md = f"```\n{overview}\n```"
-
-    # 各卷拆解
-    volume_results = result.get("volume_results", [])
-    volume_md = ""
-    for i, vr in enumerate(volume_results):
-        summary = vr.get("vol_story", "")
-        if len(summary) > 2000:
-            summary = summary[:2000] + "..."
-        volume_md += f"**卷{i+1}: {vr.get('title', '')}**\n\n{summary}\n\n---\n\n"
-
-    # 其他报告信息
-    other_md = "故事结构报告已生成，点击上方链接可下载查看完整内容。\n\n"
-    for name, path in files.items():
-        if os.path.exists(path):
-            size = os.path.getsize(path)
-            other_md += f"- **{name}**：{size:,} 字节\n"
 
     return (
         cost_html,
@@ -447,8 +420,6 @@ def _build_success_output(result):
         "<div style='background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px;'><strong>📈 处理进度</strong><br>✅ 已完成 (100%)</div>",
         file_html,
         overview_md,
-        volume_md,
-        other_md,
         gr.Button(interactive=True),
         gr.Button(interactive=False),
     )
@@ -461,8 +432,6 @@ def _build_error_output(result):
         f"❌ **错误**: {result.get('error', '未知错误')}",
         "<div style='background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;'><strong>📈 处理进度</strong><br>❌ 处理失败</div>",
         "<p style='color:#ef4444;'>处理失败</p>",
-        "处理失败",
-        "处理失败",
         "处理失败",
         gr.Button(interactive=True),
         gr.Button(interactive=False),
